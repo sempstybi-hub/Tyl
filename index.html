@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Очередь в туалет</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            padding: 20px;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+        
+        .queue-item {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+            border-left: 4px solid #667eea;
+        }
+        
+        .queue-item.current {
+            background: #e3f2fd;
+            border-left-color: #2196f3;
+            transform: scale(1.02);
+        }
+        
+        .queue-id {
+            font-weight: bold;
+            font-size: 24px;
+            color: #333;
+        }
+        
+        .queue-time {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        
+        select, input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: 500;
+        }
+        
+        .status.waiting {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status.current {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4caf50;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 1000;
+        }
+        
+        .current-user {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin: 20px 0;
+        }
+        
+        .time-slot {
+            display: inline-block;
+            background: #e3f2fd;
+            padding: 8px 15px;
+            border-radius: 20px;
+            margin: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .time-slot.selected {
+            background: #667eea;
+            color: white;
+        }
+        
+        .time-slots {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        @media (max-width: 480px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚽 Очередь в туалет</h1>
+            <p>Запишитесь в очередь и получите уведомление</p>
+        </div>
+        
+        <div class="card">
+            <div id="currentStatus" class="status waiting">
+                Вы не в очереди
+            </div>
+            
+            <div id="currentUserInfo" class="current-user" style="display: none;">
+                Ваш номер: <span id="userQueueId"></span>
+                <br>
+                <small>Примерное время: <span id="userTime"></span></small>
+            </div>
+            
+            <div class="form-group">
+                <label>Выберите время:</label>
+                <div class="time-slots" id="timeSlots">
+                    <!-- Временные слоты будут генерироваться JavaScript -->
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Или выберите букву номера:</label>
+                <select id="letterSelect">
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
+                    <option value="D">D</option>
+                </select>
+            </div>
+            
+            <button class="btn" onclick="joinQueue()">
+                Встать в очередь
+            </button>
+        </div>
+        
+        <div class="card">
+            <h2 style="margin-bottom: 20px; color: #333;">Текущая очередь:</h2>
+            <div id="queueList">
+                <!-- Очередь будет генерироваться здесь -->
+            </div>
+        </div>
+    </div>
+    
+    <div id="notification" class="notification"></div>
+    
+    <script>
+        // Инициализация Telegram Web App
+        let tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.MainButton.hide();
+        
+        // Инициализация данных
+        let queue = JSON.parse(localStorage.getItem('toiletQueue')) || [];
+        let userData = JSON.parse(localStorage.getItem('userQueueData')) || null;
+        let currentUser = null;
+        
+        // Получаем данные пользователя из Telegram
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            currentUser = {
+                id: tg.initDataUnsafe.user.id,
+                firstName: tg.initDataUnsafe.user.first_name,
+                username: tg.initDataUnsafe.user.username
+            };
+            
+            // Проверяем, есть ли пользователь уже в очереди
+            const existingInQueue = queue.find(item => item.userId === currentUser.id);
+            if (existingInQueue) {
+                userData = existingInQueue;
+                updateUserStatus();
+            }
+        }
+        
+        // Генерация временных слотов
+        function generateTimeSlots() {
+            const container = document.getElementById('timeSlots');
+            container.innerHTML = '';
+            
+            const now = new Date();
+            const slots = [];
+            
+            // Генерируем слоты на ближайшие 2 часа с интервалом 10 минут
+            for (let i = 0; i < 12; i++) {
+                const time = new Date(now.getTime() + (i + 1) * 10 * 60000);
+                const timeString = time.getHours().toString().padStart(2, '0') + ':' + 
+                                 time.getMinutes().toString().padStart(2, '0');
+                slots.push(timeString);
+            }
+            
+            slots.forEach(time => {
+                const slot = document.createElement('div');
+                slot.className = 'time-slot';
+                slot.textContent = time;
+                slot.dataset.time = time;
+                slot.onclick = () => selectTimeSlot(slot);
+                container.appendChild(slot);
+            });
+        }
+        
+        // Выбор временного слота
+        function selectTimeSlot(element) {
+            document.querySelectorAll('.time-slot').forEach(slot => {
+                slot.classList.remove('selected');
+            });
+            element.classList.add('selected');
+        }
+        
+        // Генерация ID очереди
+        function generateQueueId(letter) {
+            const numbers = queue
+                .filter(item => item.id.startsWith(letter))
+                .map(item => parseInt(item.id.slice(1)))
+                .filter(num => !isNaN(num));
+            
+            const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
+            return letter + (maxNumber + 1);
+        }
+        
+        // Встать в очередь
+        function joinQueue() {
+            if (!currentUser) {
+                showNotification('Пожалуйста, откройте приложение через Telegram');
+                return;
+            }
+            
+            const letterSelect = document.getElementById('letterSelect');
+            const selectedLetter = letterSelect.value;
+            
+            const selectedTimeSlot = document.querySelector('.time-slot.selected');
+            let selectedTime = null;
+            
+            if (selectedTimeSlot) {
+                selectedTime = selectedTimeSlot.dataset.time;
+            }
+            
+            // Проверяем, не в очереди ли уже пользователь
+            if (userData && queue.some(item => item.userId === currentUser.id)) {
+                showNotification('Вы уже в очереди!');
+                return;
+            }
+            
+            // Генерируем ID
+            const queueId = generateQueueId(selectedLetter);
+            
+            // Создаем запись в очереди
+            const queueItem = {
+                id: queueId,
+                userId: currentUser.id,
+                firstName: currentUser.firstName,
+                username: currentUser.username,
+                joinTime: new Date().toISOString(),
+                scheduledTime: selectedTime,
+                notified: false
+            };
+            
+            queue.push(queueItem);
+            userData = queueItem;
+            
+            // Сохраняем в localStorage
+            localStorage.setItem('toiletQueue', JSON.stringify(queue));
+            localStorage.setItem('userQueueData', JSON.stringify(userData));
+            
+            showNotification(`Вы добавлены в очередь с номером ${queueId}`);
+            updateQueueDisplay();
+            updateUserStatus();
+            
+            // Если есть Telegram бот, можно отправить запрос на установку уведомления
+            setupNotification(queueItem);
+        }
+        
+        // Обновление статуса пользователя
+        function updateUserStatus() {
+            const statusDiv = document.getElementById('currentStatus');
+            const userInfoDiv = document.getElementById('currentUserInfo');
+            
+            if (userData) {
+                statusDiv.className = 'status current';
+                statusDiv.textContent = `Вы в очереди под номером ${userData.id}`;
+                
+                document.getElementById('userQueueId').textContent = userData.id;
+                document.getElementById('userTime').textContent = userData.scheduledTime || 'Скоро';
+                
+                userInfoDiv.style.display = 'block';
+            } else {
+                statusDiv.className = 'status waiting';
+                statusDiv.textContent = 'Вы не в очереди';
+                userInfoDiv.style.display = 'none';
+            }
+        }
+        
+        // Обновление отображения очереди
+        function updateQueueDisplay() {
+            const queueList = document.getElementById('queueList');
+            queueList.innerHTML = '';
+            
+            // Сортируем очередь: сначала по времени, потом по ID
+            const sortedQueue = [...queue].sort((a, b) => {
+                if (a.scheduledTime && b.scheduledTime) {
+                    return a.scheduledTime.localeCompare(b.scheduledTime);
+                }
+                return a.id.localeCompare(b.id);
+            });
+            
+            sortedQueue.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'queue-item';
+                if (userData && item.userId === userData.userId) {
+                    div.classList.add('current');
+                }
+                
+                const timeInfo = item.scheduledTime 
+                    ? `Время: ${item.scheduledTime}`
+                    : `Встал в: ${new Date(item.joinTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                
+                div.innerHTML = `
+                    <div>
+                        <div class="queue-id">${item.id}</div>
+                        <div class="queue-time">${item.firstName} • ${timeInfo}</div>
+                    </div>
+                    <div>#${index + 1}</div>
+                `;
+                
+                queueList.appendChild(div);
+            });
+        }
+        
+        // Показать уведомление
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.style.display = 'block';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Настройка уведомления (имитация)
+        function setupNotification(queueItem) {
+            // В реальном приложении здесь был бы запрос к вашему бэкенду
+            // или использование Telegram Bot API для установки уведомлений
+            
+            console.log('Уведомление будет отправлено для:', queueItem);
+            
+            // Имитация: установка таймера для локального уведомления
+            if (queueItem.scheduledTime) {
+                const [hours, minutes] = queueItem.scheduledTime.split(':').map(Number);
+                const now = new Date();
+                const notificationTime = new Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate(),
+                    hours,
+                    minutes
+                );
+                
+                const timeUntilNotification = notificationTime - now;
+                
+                if (timeUntilNotification > 0) {
+                    setTimeout(() => {
+                        if (tg && tg.showPopup) {
+                            tg.showPopup({
+                                title: '⏰ Ваше время подошло!',
+                                message: `Номер ${queueItem.id}, ваш слот в туалет на ${queueItem.scheduledTime}`,
+                                buttons: [{ type: 'ok' }]
+                            });
+                        }
+                        showNotification(`Ваше время подошло! Номер ${queueItem.id}`);
+                    }, Math.min(timeUntilNotification, 60000)); // Максимум 1 минута для демо
+                }
+            }
+        }
+        
+        // Проверка уведомлений каждую минуту
+        function checkNotifications() {
+            const now = new Date();
+            const currentTime = now.getHours().toString().padStart(2, '0') + ':' + 
+                              now.getMinutes().toString().padStart(2, '0');
+            
+            queue.forEach(item => {
+                if (item.scheduledTime === currentTime && !item.notified) {
+                    item.notified = true;
+                    localStorage.setItem('toiletQueue', JSON.stringify(queue));
+                    
+                    if (item.userId === currentUser?.id) {
+                        showNotification(`Ваше время подошло! Номер ${item.id}`);
+                    }
+                }
+            });
+        }
+        
+        // Очистка старой очереди
+        function cleanupOldQueue() {
+            const now = new Date();
+            const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+            
+            queue = queue.filter(item => {
+                const joinDate = new Date(item.joinTime);
+                return joinDate > oneHourAgo;
+            });
+            
+            localStorage.setItem('toiletQueue', JSON.stringify(queue));
+        }
+        
+        // Инициализация
+        function init() {
+            generateTimeSlots();
+            cleanupOldQueue();
+            updateQueueDisplay();
+            updateUserStatus();
+            
+            // Проверяем уведомления каждую минуту
+            setInterval(checkNotifications, 60000);
+            
+            // Автоматически выбираем первый временной слот
+            setTimeout(() => {
+                const firstSlot = document.querySelector('.time-slot');
+                if (firstSlot) {
+                    selectTimeSlot(firstSlot);
+                }
+            }, 100);
+        }
+        
+        // Запуск приложения
+        init();
+        
+        // Для отладки в браузере (без Telegram)
+        if (!window.Telegram || !window.Telegram.WebApp) {
+            currentUser = {
+                id: 123456,
+                firstName: 'Тестовый',
+                username: 'test_user'
+            };
+            showNotification('Режим отладки. В реальном Telegram будут работать уведомления.');
+        }
+    </script>
+</body>
+</html>
