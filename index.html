@@ -2,11 +2,25 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Очередь в туалет</title>
+    <title>🚽 Туалетная очередь</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --bg-primary: #0f0f23;
+            --bg-secondary: #1a1a2e;
+            --bg-card: #16213e;
+            --accent: #6a11cb;
+            --accent-light: #2575fc;
+            --text-primary: #ffffff;
+            --text-secondary: #b8b8d1;
+            --success: #00b894;
+            --warning: #fdcb6e;
+            --danger: #e17055;
+        }
+        
         * {
             margin: 0;
             padding: 0;
@@ -14,265 +28,442 @@
         }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             padding: 20px;
+            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.8s ease;
+            background: var(--bg-primary);
+            z-index: 100;
+        }
+        
+        .screen.hidden {
+            transform: translateY(-100%);
+            opacity: 0;
+            pointer-events: none;
         }
         
         .container {
             max-width: 500px;
+            width: 100%;
             margin: 0 auto;
-        }
-        
-        .header {
-            text-align: center;
-            color: white;
-            margin-bottom: 30px;
             padding: 20px;
         }
         
-        .header h1 {
-            font-size: 28px;
+        .logo {
+            font-size: 64px;
+            margin-bottom: 30px;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        .title {
+            font-size: 36px;
+            font-weight: 700;
             margin-bottom: 10px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background: linear-gradient(45deg, var(--accent), var(--accent-light));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-align: center;
         }
         
-        .card {
-            background: white;
-            border-radius: 20px;
-            padding: 25px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            margin-bottom: 20px;
-        }
-        
-        .queue-item {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 15px;
-            margin-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: all 0.3s;
-            border-left: 4px solid #667eea;
-        }
-        
-        .queue-item.current {
-            background: #e3f2fd;
-            border-left-color: #2196f3;
-            transform: scale(1.02);
-        }
-        
-        .queue-id {
-            font-weight: bold;
-            font-size: 24px;
-            color: #333;
-        }
-        
-        .queue-time {
-            color: #666;
-            font-size: 14px;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #555;
-            font-weight: 500;
-        }
-        
-        select, input {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
+        .subtitle {
+            color: var(--text-secondary);
             font-size: 16px;
-            transition: border-color 0.3s;
-        }
-        
-        select:focus, input:focus {
-            outline: none;
-            border-color: #667eea;
+            text-align: center;
+            margin-bottom: 40px;
+            line-height: 1.6;
         }
         
         .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
             width: 100%;
-            transition: transform 0.2s, box-shadow 0.2s;
+            padding: 20px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 16px;
+            font-size: 18px;
+            font-weight: 600;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: left 0.6s;
+        }
+        
+        .btn:hover::after {
+            left: 100%;
         }
         
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 30px rgba(106, 17, 203, 0.3);
+            background: linear-gradient(135deg, var(--bg-card), var(--bg-secondary));
         }
         
         .btn:active {
             transform: translateY(0);
         }
         
-        .status {
-            text-align: center;
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+        }
+        
+        .time-slots-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin: 30px 0;
+        }
+        
+        .time-slot {
             padding: 15px;
-            border-radius: 10px;
-            margin: 20px 0;
-            font-weight: 500;
+            background: var(--bg-card);
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
         }
         
-        .status.waiting {
-            background: #fff3cd;
-            color: #856404;
+        .time-slot:hover {
+            transform: scale(1.05);
+            border-color: var(--accent);
         }
         
-        .status.current {
-            background: #d4edda;
-            color: #155724;
+        .time-slot.selected {
+            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(106, 17, 203, 0.4);
+        }
+        
+        .time-slot.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        
+        .back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 1000;
+            transition: color 0.3s;
+        }
+        
+        .back-btn:hover {
+            color: var(--text-primary);
+        }
+        
+        .queue-container {
+            padding: 20px 0;
+        }
+        
+        .queue-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .queue-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, var(--accent), var(--accent-light));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .current-user-card {
+            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 30px;
+            animation: pulse 2s infinite;
+            box-shadow: 0 10px 40px rgba(106, 17, 203, 0.3);
+        }
+        
+        .current-user-id {
+            font-size: 42px;
+            font-weight: 800;
+            text-align: center;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        .current-user-time {
+            text-align: center;
+            opacity: 0.9;
+            font-size: 18px;
+        }
+        
+        .queue-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .queue-item {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .queue-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 4px;
+            background: linear-gradient(to bottom, var(--accent), var(--accent-light));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .queue-item:hover::before {
+            opacity: 1;
+        }
+        
+        .queue-item:hover {
+            transform: translateX(10px);
+            background: var(--bg-secondary);
+        }
+        
+        .queue-item.current-user-item {
+            background: linear-gradient(135deg, rgba(106, 17, 203, 0.2), rgba(37, 117, 252, 0.2));
+            border: 2px solid var(--accent);
+        }
+        
+        .queue-id {
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(45deg, var(--accent-light), #fff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .queue-info {
+            text-align: right;
+        }
+        
+        .queue-time {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        .queue-position {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--accent-light);
         }
         
         .notification {
             position: fixed;
-            top: 20px;
+            bottom: 20px;
             right: 20px;
-            background: #4caf50;
+            background: var(--success);
             color: white;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-            display: none;
+            padding: 15px 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 1000;
         }
         
-        .current-user {
-            text-align: center;
-            font-size: 18px;
-            font-weight: bold;
-            color: #333;
-            margin: 20px 0;
+        .notification.show {
+            transform: translateY(0);
+            opacity: 1;
         }
         
-        .time-slot {
+        .loader {
             display: inline-block;
-            background: #e3f2fd;
-            padding: 8px 15px;
-            border-radius: 20px;
-            margin: 5px;
-            cursor: pointer;
-            transition: all 0.3s;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: var(--accent);
+            animation: spin 1s ease-in-out infinite;
         }
         
-        .time-slot.selected {
-            background: #667eea;
-            color: white;
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
         }
         
-        .time-slots {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 10px;
-            margin: 15px 0;
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.02); opacity: 0.9; }
         }
         
-        @media (max-width: 480px) {
-            .container {
-                padding: 10px;
-            }
-            
-            .card {
-                padding: 20px;
-            }
-            
-            .header h1 {
-                font-size: 24px;
-            }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
+        
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .animate-slide-up {
+            animation: slideUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+        
+        .animate-delay-1 { animation-delay: 0.1s; opacity: 0; }
+        .animate-delay-2 { animation-delay: 0.2s; opacity: 0; }
+        .animate-delay-3 { animation-delay: 0.3s; opacity: 0; }
+        .animate-delay-4 { animation-delay: 0.4s; opacity: 0; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🚽 Очередь в туалет</h1>
-            <p>Запишитесь в очередь и получите уведомление</p>
-        </div>
-        
-        <div class="card">
-            <div id="currentStatus" class="status waiting">
-                Вы не в очереди
-            </div>
-            
-            <div id="currentUserInfo" class="current-user" style="display: none;">
-                Ваш номер: <span id="userQueueId"></span>
-                <br>
-                <small>Примерное время: <span id="userTime"></span></small>
-            </div>
-            
-            <div class="form-group">
-                <label>Выберите время:</label>
-                <div class="time-slots" id="timeSlots">
-                    <!-- Временные слоты будут генерироваться JavaScript -->
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label>Или выберите букву номера:</label>
-                <select id="letterSelect">
-                    <option value="A">A</option>
-                    <option value="B">B</option>
-                    <option value="C">C</option>
-                    <option value="D">D</option>
-                </select>
-            </div>
-            
-            <button class="btn" onclick="joinQueue()">
-                Встать в очередь
+    <!-- Экран приветствия -->
+    <div id="welcomeScreen" class="screen">
+        <div class="logo">🚽</div>
+        <h1 class="title animate-slide-up">Туалетная очередь</h1>
+        <p class="subtitle animate-slide-up animate-delay-1">
+            Запишитесь на время или встаньте в живую очередь.<br>
+            Получите уведомление, когда подойдёт ваша очередь.
+        </p>
+        <div class="container animate-slide-up animate-delay-2">
+            <button class="btn btn-primary" onclick="showTimeSelection()">
+                📅 Записаться по времени
+            </button>
+            <button class="btn" onclick="showQueue()">
+                👥 Встать в очередь
             </button>
         </div>
-        
-        <div class="card">
-            <h2 style="margin-bottom: 20px; color: #333;">Текущая очередь:</h2>
-            <div id="queueList">
-                <!-- Очередь будет генерироваться здесь -->
+    </div>
+
+    <!-- Экран выбора времени -->
+    <div id="timeScreen" class="screen hidden">
+        <button class="back-btn" onclick="showWelcome()">← Назад</button>
+        <div class="container">
+            <h1 class="title animate-slide-up">Выберите время</h1>
+            <p class="subtitle animate-slide-up animate-delay-1">
+                Выберите удобное время для посещения
+            </p>
+            
+            <div id="timeSlots" class="time-slots-grid animate-slide-up animate-delay-2">
+                <!-- Временные слоты будут сгенерированы JavaScript -->
+            </div>
+            
+            <button id="confirmTimeBtn" class="btn btn-primary animate-slide-up animate-delay-3" onclick="confirmTimeSelection()">
+                Подтвердить выбор
+            </button>
+        </div>
+    </div>
+
+    <!-- Экран очереди -->
+    <div id="queueScreen" class="screen hidden">
+        <button class="back-btn" onclick="showWelcome()">← Назад</button>
+        <div class="queue-container">
+            <div class="queue-header animate-slide-up">
+                <h1 class="queue-title">Текущая очередь</h1>
+                <p class="subtitle" id="queueSubtitle">
+                    <!-- Текст будет обновляться JavaScript -->
+                </p>
+            </div>
+            
+            <div id="currentUserCard" class="current-user-card animate-slide-up animate-delay-1" style="display: none;">
+                <div class="current-user-id" id="currentUserId"></div>
+                <div class="current-user-time" id="currentUserTime"></div>
+            </div>
+            
+            <div id="queueList" class="queue-list animate-slide-up animate-delay-2">
+                <!-- Очередь будет сгенерирована JavaScript -->
             </div>
         </div>
     </div>
-    
+
+    <!-- Уведомление -->
     <div id="notification" class="notification"></div>
-    
+
     <script>
         // Инициализация Telegram Web App
         let tg = window.Telegram.WebApp;
         tg.expand();
         tg.MainButton.hide();
         
-        // Инициализация данных
+        // Глобальные переменные
         let queue = JSON.parse(localStorage.getItem('toiletQueue')) || [];
-        let userData = JSON.parse(localStorage.getItem('userQueueData')) || null;
         let currentUser = null;
+        let selectedTime = null;
+        let userQueueId = null;
         
-        // Получаем данные пользователя из Telegram
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            currentUser = {
-                id: tg.initDataUnsafe.user.id,
-                firstName: tg.initDataUnsafe.user.first_name,
-                username: tg.initDataUnsafe.user.username
-            };
+        // Инициализация пользователя
+        function initUser() {
+            if (tg.initDataUnsafe?.user) {
+                currentUser = {
+                    id: tg.initDataUnsafe.user.id,
+                    firstName: tg.initDataUnsafe.user.first_name || 'Пользователь',
+                    username: tg.initDataUnsafe.user.username
+                };
+            } else {
+                // Режим отладки
+                currentUser = {
+                    id: Date.now(),
+                    firstName: 'Тестовый Пользователь',
+                    username: 'test_user'
+                };
+            }
             
             // Проверяем, есть ли пользователь уже в очереди
-            const existingInQueue = queue.find(item => item.userId === currentUser.id);
-            if (existingInQueue) {
-                userData = existingInQueue;
-                updateUserStatus();
+            checkExistingQueue();
+        }
+        
+        // Генерация случайного ID (буква + 2 цифры)
+        function generateRandomId() {
+            const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+            const letter = letters[Math.floor(Math.random() * letters.length)];
+            const number = Math.floor(Math.random() * 90) + 10; // 10-99
+            return letter + number;
+        }
+        
+        // Проверка существования пользователя в очереди
+        function checkExistingQueue() {
+            const existingEntry = queue.find(item => item.userId === currentUser.id);
+            if (existingEntry) {
+                userQueueId = existingEntry.id;
+                selectedTime = existingEntry.scheduledTime;
+                showQueue();
             }
         }
         
@@ -284,20 +475,30 @@
             const now = new Date();
             const slots = [];
             
-            // Генерируем слоты на ближайшие 2 часа с интервалом 10 минут
-            for (let i = 0; i < 12; i++) {
-                const time = new Date(now.getTime() + (i + 1) * 10 * 60000);
+            // Генерируем слоты на ближайшие 4 часа с интервалом 15 минут
+            for (let i = 0; i < 16; i++) {
+                const time = new Date(now.getTime() + (i + 1) * 15 * 60000);
                 const timeString = time.getHours().toString().padStart(2, '0') + ':' + 
                                  time.getMinutes().toString().padStart(2, '0');
                 slots.push(timeString);
             }
+            
+            // Отмечаем занятые слоты
+            const busySlots = queue.map(item => item.scheduledTime).filter(Boolean);
             
             slots.forEach(time => {
                 const slot = document.createElement('div');
                 slot.className = 'time-slot';
                 slot.textContent = time;
                 slot.dataset.time = time;
-                slot.onclick = () => selectTimeSlot(slot);
+                
+                if (busySlots.includes(time)) {
+                    slot.classList.add('disabled');
+                    slot.title = 'Время занято';
+                } else {
+                    slot.onclick = () => selectTimeSlot(slot);
+                }
+                
                 container.appendChild(slot);
             });
         }
@@ -308,176 +509,140 @@
                 slot.classList.remove('selected');
             });
             element.classList.add('selected');
+            selectedTime = element.dataset.time;
         }
         
-        // Генерация ID очереди
-        function generateQueueId(letter) {
-            const numbers = queue
-                .filter(item => item.id.startsWith(letter))
-                .map(item => parseInt(item.id.slice(1)))
-                .filter(num => !isNaN(num));
-            
-            const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
-            return letter + (maxNumber + 1);
-        }
-        
-        // Встать в очередь
-        function joinQueue() {
-            if (!currentUser) {
-                showNotification('Пожалуйста, откройте приложение через Telegram');
+        // Подтверждение выбора времени
+        function confirmTimeSelection() {
+            if (!selectedTime) {
+                showNotification('Выберите время');
                 return;
             }
             
-            const letterSelect = document.getElementById('letterSelect');
-            const selectedLetter = letterSelect.value;
+            // Генерируем случайный ID
+            userQueueId = generateRandomId();
             
-            const selectedTimeSlot = document.querySelector('.time-slot.selected');
-            let selectedTime = null;
-            
-            if (selectedTimeSlot) {
-                selectedTime = selectedTimeSlot.dataset.time;
-            }
-            
-            // Проверяем, не в очереди ли уже пользователь
-            if (userData && queue.some(item => item.userId === currentUser.id)) {
-                showNotification('Вы уже в очереди!');
-                return;
-            }
-            
-            // Генерируем ID
-            const queueId = generateQueueId(selectedLetter);
-            
-            // Создаем запись в очереди
+            // Добавляем в очередь
             const queueItem = {
-                id: queueId,
+                id: userQueueId,
                 userId: currentUser.id,
                 firstName: currentUser.firstName,
-                username: currentUser.username,
-                joinTime: new Date().toISOString(),
                 scheduledTime: selectedTime,
-                notified: false
+                joinTime: new Date().toISOString(),
+                isRandom: false
             };
             
             queue.push(queueItem);
-            userData = queueItem;
+            saveQueue();
             
-            // Сохраняем в localStorage
-            localStorage.setItem('toiletQueue', JSON.stringify(queue));
-            localStorage.setItem('userQueueData', JSON.stringify(userData));
-            
-            showNotification(`Вы добавлены в очередь с номером ${queueId}`);
-            updateQueueDisplay();
-            updateUserStatus();
-            
-            // Если есть Telegram бот, можно отправить запрос на установку уведомления
-            setupNotification(queueItem);
+            // Показываем очередь
+            showQueue();
         }
         
-        // Обновление статуса пользователя
-        function updateUserStatus() {
-            const statusDiv = document.getElementById('currentStatus');
-            const userInfoDiv = document.getElementById('currentUserInfo');
+        // Добавление в живую очередь (без времени)
+        function addToLiveQueue() {
+            // Генерируем случайный ID
+            userQueueId = generateRandomId();
             
-            if (userData) {
-                statusDiv.className = 'status current';
-                statusDiv.textContent = `Вы в очереди под номером ${userData.id}`;
-                
-                document.getElementById('userQueueId').textContent = userData.id;
-                document.getElementById('userTime').textContent = userData.scheduledTime || 'Скоро';
-                
-                userInfoDiv.style.display = 'block';
-            } else {
-                statusDiv.className = 'status waiting';
-                statusDiv.textContent = 'Вы не в очереди';
-                userInfoDiv.style.display = 'none';
-            }
+            // Добавляем в очередь
+            const queueItem = {
+                id: userQueueId,
+                userId: currentUser.id,
+                firstName: currentUser.firstName,
+                scheduledTime: null,
+                joinTime: new Date().toISOString(),
+                isRandom: true
+            };
+            
+            queue.push(queueItem);
+            saveQueue();
+            
+            // Показываем очередь
+            showQueue();
+        }
+        
+        // Сохранение очереди
+        function saveQueue() {
+            localStorage.setItem('toiletQueue', JSON.stringify(queue));
         }
         
         // Обновление отображения очереди
         function updateQueueDisplay() {
-            const queueList = document.getElementById('queueList');
-            queueList.innerHTML = '';
+            const container = document.getElementById('queueList');
+            const subtitle = document.getElementById('queueSubtitle');
+            const currentUserCard = document.getElementById('currentUserCard');
+            const currentUserId = document.getElementById('currentUserId');
+            const currentUserTime = document.getElementById('currentUserTime');
             
-            // Сортируем очередь: сначала по времени, потом по ID
+            container.innerHTML = '';
+            
+            if (queue.length === 0) {
+                subtitle.textContent = 'Очередь пуста. Будьте первым!';
+                currentUserCard.style.display = 'none';
+                return;
+            }
+            
+            // Сортируем очередь: по времени, затем по времени добавления
             const sortedQueue = [...queue].sort((a, b) => {
                 if (a.scheduledTime && b.scheduledTime) {
                     return a.scheduledTime.localeCompare(b.scheduledTime);
                 }
-                return a.id.localeCompare(b.id);
+                if (a.scheduledTime) return -1;
+                if (b.scheduledTime) return 1;
+                return new Date(a.joinTime) - new Date(b.joinTime);
             });
             
+            // Обновляем подзаголовок
+            subtitle.textContent = `Всего в очереди: ${queue.length} человек`;
+            
+            // Показываем карточку текущего пользователя
+            const userEntry = queue.find(item => item.userId === currentUser.id);
+            if (userEntry) {
+                currentUserCard.style.display = 'block';
+                currentUserId.textContent = userEntry.id;
+                currentUserTime.textContent = userEntry.scheduledTime 
+                    ? `Ваше время: ${userEntry.scheduledTime}`
+                    : `Вы в живой очереди`;
+            } else {
+                currentUserCard.style.display = 'none';
+            }
+            
+            // Отображаем очередь
             sortedQueue.forEach((item, index) => {
                 const div = document.createElement('div');
                 div.className = 'queue-item';
-                if (userData && item.userId === userData.userId) {
-                    div.classList.add('current');
+                
+                if (item.userId === currentUser.id) {
+                    div.classList.add('current-user-item');
                 }
                 
                 const timeInfo = item.scheduledTime 
                     ? `Время: ${item.scheduledTime}`
                     : `Встал в: ${new Date(item.joinTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
                 
+                const position = index + 1;
+                let positionText = '';
+                
+                if (item.scheduledTime) {
+                    positionText = `⏰ ${item.scheduledTime}`;
+                } else {
+                    positionText = `#${position}`;
+                }
+                
                 div.innerHTML = `
-                    <div>
-                        <div class="queue-id">${item.id}</div>
-                        <div class="queue-time">${item.firstName} • ${timeInfo}</div>
+                    <div class="queue-id">${item.id}</div>
+                    <div class="queue-info">
+                        <div class="queue-position">${positionText}</div>
+                        <div class="queue-time">${item.firstName}</div>
                     </div>
-                    <div>#${index + 1}</div>
                 `;
                 
-                queueList.appendChild(div);
+                container.appendChild(div);
             });
         }
         
-        // Показать уведомление
-        function showNotification(message) {
-            const notification = document.getElementById('notification');
-            notification.textContent = message;
-            notification.style.display = 'block';
-            
-            setTimeout(() => {
-                notification.style.display = 'none';
-            }, 3000);
-        }
-        
-        // Настройка уведомления (имитация)
-        function setupNotification(queueItem) {
-            // В реальном приложении здесь был бы запрос к вашему бэкенду
-            // или использование Telegram Bot API для установки уведомлений
-            
-            console.log('Уведомление будет отправлено для:', queueItem);
-            
-            // Имитация: установка таймера для локального уведомления
-            if (queueItem.scheduledTime) {
-                const [hours, minutes] = queueItem.scheduledTime.split(':').map(Number);
-                const now = new Date();
-                const notificationTime = new Date(
-                    now.getFullYear(),
-                    now.getMonth(),
-                    now.getDate(),
-                    hours,
-                    minutes
-                );
-                
-                const timeUntilNotification = notificationTime - now;
-                
-                if (timeUntilNotification > 0) {
-                    setTimeout(() => {
-                        if (tg && tg.showPopup) {
-                            tg.showPopup({
-                                title: '⏰ Ваше время подошло!',
-                                message: `Номер ${queueItem.id}, ваш слот в туалет на ${queueItem.scheduledTime}`,
-                                buttons: [{ type: 'ok' }]
-                            });
-                        }
-                        showNotification(`Ваше время подошло! Номер ${queueItem.id}`);
-                    }, Math.min(timeUntilNotification, 60000)); // Максимум 1 минута для демо
-                }
-            }
-        }
-        
-        // Проверка уведомлений каждую минуту
-        function checkNotifications() {
+        // Проверка и отправка уведомлений
+        function checkAndSendNotifications() {
             const now = new Date();
             const currentTime = now.getHours().toString().padStart(2, '0') + ':' + 
                               now.getMinutes().toString().padStart(2, '0');
@@ -485,59 +650,117 @@
             queue.forEach(item => {
                 if (item.scheduledTime === currentTime && !item.notified) {
                     item.notified = true;
-                    localStorage.setItem('toiletQueue', JSON.stringify(queue));
+                    saveQueue();
                     
-                    if (item.userId === currentUser?.id) {
-                        showNotification(`Ваше время подошло! Номер ${item.id}`);
+                    if (item.userId === currentUser.id) {
+                        showNotification(`⏰ Ваше время подошло! Номер ${item.id}`);
+                        
+                        // В реальном приложении здесь будет отправка уведомления через Telegram Bot API
+                        if (tg && tg.showPopup) {
+                            setTimeout(() => {
+                                tg.showPopup({
+                                    title: '⏰ Ваша очередь!',
+                                    message: `Номер ${item.id}, ваше время в туалет на ${item.scheduledTime}`,
+                                    buttons: [{ type: 'ok' }]
+                                });
+                            }, 1000);
+                        }
                     }
                 }
             });
         }
         
-        // Очистка старой очереди
-        function cleanupOldQueue() {
+        // Показ уведомления
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Навигация между экранами
+        function showWelcome() {
+            document.getElementById('welcomeScreen').classList.remove('hidden');
+            document.getElementById('timeScreen').classList.add('hidden');
+            document.getElementById('queueScreen').classList.add('hidden');
+        }
+        
+        function showTimeSelection() {
+            document.getElementById('welcomeScreen').classList.add('hidden');
+            document.getElementById('timeScreen').classList.remove('hidden');
+            document.getElementById('queueScreen').classList.add('hidden');
+            
+            generateTimeSlots();
+        }
+        
+        function showQueue() {
+            document.getElementById('welcomeScreen').classList.add('hidden');
+            document.getElementById('timeScreen').classList.add('hidden');
+            document.getElementById('queueScreen').classList.remove('hidden');
+            
+            // Если пользователь нажал "Встать в очередь", добавляем его
+            if (!userQueueId && !queue.find(item => item.userId === currentUser.id)) {
+                addToLiveQueue();
+            }
+            
+            updateQueueDisplay();
+        }
+        
+        // Очистка старых записей (старше 24 часов)
+        function cleanupOldEntries() {
             const now = new Date();
-            const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+            const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
             
             queue = queue.filter(item => {
                 const joinDate = new Date(item.joinTime);
-                return joinDate > oneHourAgo;
+                return joinDate > twentyFourHoursAgo;
             });
             
-            localStorage.setItem('toiletQueue', JSON.stringify(queue));
+            saveQueue();
         }
         
-        // Инициализация
+        // Синхронизация через localStorage (имитация)
+        function syncQueue() {
+            // В реальном приложении здесь будет синхронизация с сервером
+            const savedQueue = localStorage.getItem('toiletQueue');
+            if (savedQueue) {
+                try {
+                    const parsed = JSON.parse(savedQueue);
+                    // Слияние локальной и сохраненной очереди
+                    queue = [...queue, ...parsed]
+                        .filter((item, index, self) =>
+                            index === self.findIndex(t => t.userId === item.userId)
+                        );
+                    saveQueue();
+                } catch (e) {
+                    console.error('Ошибка синхронизации:', e);
+                }
+            }
+        }
+        
+        // Инициализация приложения
         function init() {
-            generateTimeSlots();
-            cleanupOldQueue();
-            updateQueueDisplay();
-            updateUserStatus();
+            initUser();
+            cleanupOldEntries();
+            syncQueue();
             
             // Проверяем уведомления каждую минуту
-            setInterval(checkNotifications, 60000);
+            setInterval(checkAndSendNotifications, 60000);
             
-            // Автоматически выбираем первый временной слот
-            setTimeout(() => {
-                const firstSlot = document.querySelector('.time-slot');
-                if (firstSlot) {
-                    selectTimeSlot(firstSlot);
-                }
-            }, 100);
+            // Первоначальная проверка
+            checkAndSendNotifications();
+            
+            // Автоматический показ очереди, если пользователь уже в ней
+            if (userQueueId) {
+                setTimeout(() => showQueue(), 500);
+            }
         }
         
         // Запуск приложения
         init();
-        
-        // Для отладки в браузере (без Telegram)
-        if (!window.Telegram || !window.Telegram.WebApp) {
-            currentUser = {
-                id: 123456,
-                firstName: 'Тестовый',
-                username: 'test_user'
-            };
-            showNotification('Режим отладки. В реальном Telegram будут работать уведомления.');
-        }
     </script>
 </body>
 </html>
