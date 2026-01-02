@@ -211,6 +211,14 @@
             text-align: center;
         }
         
+        .update-status {
+            color: var(--text-secondary);
+            font-size: 12px;
+            margin-top: 10px;
+            text-align: center;
+            opacity: 0.7;
+        }
+        
         .current-user-card {
             background: var(--bg-card);
             border: 1px solid var(--accent);
@@ -349,21 +357,6 @@
             animation: spin 1s linear infinite;
         }
         
-        .status-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            margin-left: 8px;
-            background: var(--bg-secondary);
-            color: var(--text-secondary);
-        }
-        
-        .status-badge.active {
-            background: var(--accent);
-            color: var(--bg-primary);
-        }
-        
         @keyframes subtleFloat {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-8px); }
@@ -419,6 +412,20 @@
             background: var(--border);
             margin: 25px 20px;
             opacity: 0.5;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+            background: var(--text-muted);
+        }
+        
+        .status-indicator.online {
+            background: var(--accent);
+            animation: subtlePulse 2s infinite;
         }
     </style>
 </head>
@@ -479,6 +486,10 @@
                 <h1 class="queue-title">Текущая очередь</h1>
                 <div class="date-display" id="queueDateDisplay"></div>
                 <p class="subtitle" id="queueSubtitle">Загрузка...</p>
+                <div class="update-status" id="updateStatus">
+                    <span class="status-indicator"></span>
+                    <span id="lastUpdateTime">Автообновление каждую минуту</span>
+                </div>
             </div>
             
             <div id="currentUserCard" class="current-user-card" style="display: none;">
@@ -490,7 +501,7 @@
                 <!-- Очередь будет сгенерирована JavaScript -->
             </div>
             
-            <div class="scroll-hint">↕ Прокрутите вниз для обновления</div>
+            <div class="scroll-hint">↕ Обновляется автоматически каждую минуту</div>
         </div>
     </div>
 
@@ -498,29 +509,37 @@
     <div id="notification" class="notification"></div>
 
     <script>
-        // Конфигурация
-        const CONFIG = {
-            SERVER_URL: 'https://api.github.com/repos/sempstybi-hub/Tyl/contents',
-            GITHUB_TOKEN: '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', // Нужно заменить на ваш
-            BRANCH: 'main'
-        };
+        // === КОНФИГУРАЦИЯ ===
+        // ЗАМЕНИТЕ ЭТИ ДАННЫЕ НА СВОИ:
+        const GITHUB_USERNAME = 'sempstybi-hub';      // Ваш логин GitHub
+        const GITHUB_REPO = 'Tyl';              // Название репозитория
+        const GITHUB_BRANCH = 'main';                // Оставьте 'main' или измените на 'master'
+        const JSON_FILE_NAME = 'TabloZpisi.json';    // Имя вашего JSON-файла
         
-        // Инициализация Telegram Web App
-        let tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.MainButton.hide();
+        // Автоматически формируем URL к файлу
+        const JSON_FILE_URL = `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${GITHUB_REPO}/${GITHUB_BRANCH}/${JSON_FILE_NAME}`;
         
-        // Глобальные переменные
+        // === ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ===
         let currentUser = null;
         let selectedTime = null;
         let selectedDuration = 15;
         let userQueueId = null;
         let todayQueue = [];
-        let isSyncing = false;
+        let lastUpdateTime = null;
+        let autoRefreshInterval = null;
+        let updateStatusElement = null;
+        let lastUpdateTimeElement = null;
         
-        // Инициализация пользователя
+        // === ИНИЦИАЛИЗАЦИЯ TELEGRAM WEB APP ===
+        let tg = window.Telegram.WebApp;
+        if (tg && tg.init) {
+            tg.expand();
+            tg.MainButton.hide();
+        }
+        
+        // === ИНИЦИАЛИЗАЦИЯ ПОЛЬЗОВАТЕЛЯ ===
         function initUser() {
-            if (tg.initDataUnsafe?.user) {
+            if (tg && tg.initDataUnsafe?.user) {
                 currentUser = {
                     id: tg.initDataUnsafe.user.id,
                     firstName: tg.initDataUnsafe.user.first_name || 'Гость',
@@ -536,7 +555,7 @@
             }
         }
         
-        // Генерация случайного ID
+        // === ГЕНЕРАЦИЯ СЛУЧАЙНОГО ID ===
         function generateRandomId() {
             const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
             const letter = letters[Math.floor(Math.random() * letters.length)];
@@ -544,123 +563,267 @@
             return `${letter}${number}`;
         }
         
-        // Получение текущей даты в формате YYYY-MM-DD
-        function getCurrentDate() {
-            const now = new Date();
-            return now.toISOString().split('T')[0];
-        }
-        
-        // Получение имени файла для текущей даты
-        function getQueueFileName(date = getCurrentDate()) {
-            return `queue_${date}.json`;
-        }
-        
-        // Загрузка очереди с GitHub
+        // === ЗАГРУЗКА ОЧЕРЕДИ ИЗ GITHUB ===
         async function loadQueueFromGitHub() {
-            const date = getCurrentDate();
-            const fileName = getQueueFileName(date);
-            
             try {
-                const response = await fetch(`${CONFIG.SERVER_URL}/${fileName}`, {
-                    headers: {
-                        'Authorization': `token ${CONFIG.GITHUB_TOKEN}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
+                // Обновляем статус
+                if (updateStatusElement) {
+                    updateStatusElement.style.display = 'block';
+                    const statusIndicator = updateStatusElement.querySelector('.status-indicator');
+                    const timeText = lastUpdateTimeElement;
+                    
+                    if (statusIndicator) statusIndicator.classList.remove('online');
+                    if (timeText) timeText.textContent = '🔄 Загрузка...';
+                }
                 
-                if (response.status === 200) {
-                    const data = await response.json();
-                    const content = JSON.parse(atob(data.content));
-                    todayQueue = content.queue || [];
-                    showNotification('Очередь загружена');
-                    return true;
-                } else if (response.status === 404) {
-                    // Файл не существует, создаем пустую очередь
-                    todayQueue = [];
-                    return true;
+                // Загружаем с таймстампом для избежания кэширования
+                const response = await fetch(`${JSON_FILE_URL}?t=${Date.now()}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Ошибка загрузки: ${response.status}`);
                 }
-            } catch (error) {
-                console.error('Ошибка загрузки:', error);
-                // Загружаем из localStorage как запасной вариант
-                const localData = localStorage.getItem(`queue_${date}`);
-                if (localData) {
-                    todayQueue = JSON.parse(localData);
+                
+                const data = await response.json();
+                
+                // Проверяем структуру данных
+                if (data && Array.isArray(data.queue)) {
+                    const oldLength = todayQueue.length;
+                    todayQueue = data.queue;
+                    lastUpdateTime = new Date();
+                    
+                    // Обновляем отображение
+                    updateQueueDisplay();
+                    
+                    // Обновляем статус
+                    if (updateStatusElement) {
+                        const statusIndicator = updateStatusElement.querySelector('.status-indicator');
+                        const timeText = lastUpdateTimeElement;
+                        
+                        if (statusIndicator) statusIndicator.classList.add('online');
+                        if (timeText) {
+                            const timeString = lastUpdateTime.toLocaleTimeString('ru-RU', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit'
+                            });
+                            timeText.textContent = `Обновлено: ${timeString}`;
+                        }
+                    }
+                    
+                    // Показываем уведомление только при реальных изменениях
+                    if (oldLength !== todayQueue.length) {
+                        showNotification(`Очередь обновлена. Записей: ${todayQueue.length}`);
+                    }
+                    
+                    return true;
                 } else {
+                    throw new Error('Неверный формат JSON-файла');
+                }
+                
+            } catch (error) {
+                console.error('Ошибка загрузки очереди:', error);
+                
+                // Пробуем загрузить из localStorage как запасной вариант
+                try {
+                    const localData = localStorage.getItem('toilet_queue_backup');
+                    if (localData) {
+                        const parsed = JSON.parse(localData);
+                        const oldLength = todayQueue.length;
+                        todayQueue = parsed.queue || [];
+                        lastUpdateTime = new Date();
+                        
+                        updateQueueDisplay();
+                        
+                        if (updateStatusElement) {
+                            const timeText = lastUpdateTimeElement;
+                            if (timeText) {
+                                timeText.textContent = '⚠ Используем локальную копию';
+                            }
+                        }
+                        
+                        if (oldLength !== todayQueue.length) {
+                            showNotification('Загружена локальная копия очереди');
+                        }
+                    }
+                } catch (localError) {
                     todayQueue = [];
                 }
-                showNotification('Используем локальную очередь');
+                
+                const subtitle = document.getElementById('queueSubtitle');
+                if (subtitle) subtitle.textContent = 'Ошибка загрузки очереди';
+                
+                return false;
             }
-            
-            return false;
         }
         
-        // Сохранение очереди на GitHub
-        async function saveQueueToGitHub() {
-            if (isSyncing) return;
-            
-            isSyncing = true;
-            const date = getCurrentDate();
-            const fileName = getQueueFileName(date);
-            const content = {
-                date: date,
+        // === ЛОКАЛЬНОЕ СОХРАНЕНИЕ ОЧЕРЕДИ ===
+        function saveQueueLocally() {
+            const queueData = {
+                date: new Date().toISOString().split('T')[0],
                 updated: new Date().toISOString(),
                 queue: todayQueue
             };
             
-            const contentBase64 = btoa(JSON.stringify(content, null, 2));
+            // Сохраняем в localStorage
+            localStorage.setItem('toilet_queue_backup', JSON.stringify(queueData));
             
-            // Сохраняем локально как запасной вариант
-            localStorage.setItem(`queue_${date}`, JSON.stringify(content));
+            // Показываем уведомление
+            showNotification('Запись сохранена локально');
             
-            try {
-                // Сначала проверяем существование файла
-                const checkResponse = await fetch(`${CONFIG.SERVER_URL}/${fileName}`, {
-                    headers: {
-                        'Authorization': `token ${CONFIG.GITHUB_TOKEN}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
-                
-                let sha = null;
-                if (checkResponse.status === 200) {
-                    const existingData = await checkResponse.json();
-                    sha = existingData.sha;
-                }
-                
-                const response = await fetch(`${CONFIG.SERVER_URL}/${fileName}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `token ${CONFIG.GITHUB_TOKEN}`,
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        message: `Update queue for ${date}`,
-                        content: contentBase64,
-                        sha: sha,
-                        branch: CONFIG.BRANCH
-                    })
-                });
-                
-                if (response.ok) {
-                    showNotification('Очередь сохранена');
-                }
-            } catch (error) {
-                console.error('Ошибка сохранения:', error);
-                showNotification('Ошибка синхронизации');
-            } finally {
-                isSyncing = false;
-            }
+            // Выводим данные для ручной синхронизации
+            console.log('=== ДАННЫЕ ДЛЯ СИНХРОНИЗАЦИИ ===');
+            console.log('Скопируйте этот JSON и вставьте в файл queue_data.json на GitHub:');
+            console.log(JSON.stringify(queueData, null, 2));
+            console.log('================================');
         }
         
-        // Проверка, есть ли пользователь уже в очереди
+        // === НАСТРОЙКА АВТООБНОВЛЕНИЯ ===
+        function setupAutoRefresh() {
+            // Инициализируем элементы статуса
+            updateStatusElement = document.getElementById('updateStatus');
+            lastUpdateTimeElement = document.getElementById('lastUpdateTime');
+            
+            // Загружаем сразу при открытии
+            loadQueueFromGitHub();
+            
+            // Устанавливаем интервал обновления каждую минуту (60000 мс)
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+            
+            autoRefreshInterval = setInterval(async () => {
+                await loadQueueFromGitHub();
+                
+                // Обновляем информацию о времени
+                if (lastUpdateTime && lastUpdateTimeElement) {
+                    const now = new Date();
+                    const diffMinutes = Math.floor((now - lastUpdateTime) / 60000);
+                    
+                    if (diffMinutes > 0) {
+                        lastUpdateTimeElement.textContent = `Обновлено ${diffMinutes} мин назад`;
+                    }
+                }
+                
+            }, 60000); // 60000 мс = 1 минута
+        }
+        
+        // === ОБНОВЛЕНИЕ ОТОБРАЖЕНИЯ ОЧЕРЕДИ ===
+        function updateQueueDisplay() {
+            const container = document.getElementById('queueList');
+            const subtitle = document.getElementById('queueSubtitle');
+            const currentUserCard = document.getElementById('currentUserCard');
+            const currentUserId = document.getElementById('currentUserId');
+            const currentUserTime = document.getElementById('currentUserTime');
+            
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            if (todayQueue.length === 0) {
+                if (subtitle) subtitle.textContent = 'Очередь пуста. Будьте первым!';
+                if (currentUserCard) currentUserCard.style.display = 'none';
+                return;
+            }
+            
+            // Обновляем информацию
+            if (subtitle) subtitle.textContent = `Записей: ${todayQueue.length}`;
+            
+            // Показываем карточку текущего пользователя
+            const userEntry = checkUserInQueue();
+            if (userEntry && currentUserCard && currentUserId && currentUserTime) {
+                currentUserCard.style.display = 'block';
+                currentUserId.textContent = userEntry.id;
+                
+                if (userEntry.scheduledTime) {
+                    const endTime = calculateEndTime(userEntry.scheduledTime, userEntry.duration);
+                    currentUserTime.textContent = `${userEntry.scheduledTime} - ${endTime} (${userEntry.duration} мин)`;
+                } else {
+                    currentUserTime.textContent = 'Вы в живой очереди';
+                }
+            } else if (currentUserCard) {
+                currentUserCard.style.display = 'none';
+            }
+            
+            // Сортируем очередь
+            const sortedQueue = [...todayQueue].sort((a, b) => {
+                if (a.scheduledTime && b.scheduledTime) {
+                    return a.scheduledTime.localeCompare(b.scheduledTime);
+                }
+                if (a.scheduledTime) return -1;
+                if (b.scheduledTime) return 1;
+                return new Date(a.joinTime) - new Date(b.joinTime);
+            });
+            
+            // Отображаем очередь
+            sortedQueue.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'queue-item';
+                div.style.animationDelay = `${index * 0.05}s`;
+                
+                if (item.userId === currentUser.id) {
+                    div.classList.add('current-user-item');
+                }
+                
+                let timeInfo = '';
+                let durationInfo = '';
+                
+                if (item.scheduledTime) {
+                    const endTime = calculateEndTime(item.scheduledTime, item.duration);
+                    timeInfo = `${item.scheduledTime} - ${endTime}`;
+                    durationInfo = `${item.duration} мин`;
+                } else {
+                    const joinTime = new Date(item.joinTime);
+                    timeInfo = `Встал: ${joinTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'})}`;
+                    durationInfo = `~${item.duration} мин`;
+                }
+                
+                div.innerHTML = `
+                    <div class="queue-id">${item.id}</div>
+                    <div class="queue-info">
+                        <div class="queue-time">${timeInfo}</div>
+                        <div class="queue-duration">${durationInfo}</div>
+                    </div>
+                `;
+                
+                container.appendChild(div);
+            });
+        }
+        
+        // === РАСЧЁТ ВРЕМЕНИ ОКОНЧАНИЯ ===
+        function calculateEndTime(startTime, duration) {
+            const [hours, minutes] = startTime.split(':').map(Number);
+            const totalMinutes = hours * 60 + minutes + duration;
+            const endHours = Math.floor(totalMinutes / 60) % 24;
+            const endMinutes = totalMinutes % 60;
+            return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
+        }
+        
+        // === ПРОВЕРКА УВЕДОМЛЕНИЙ ===
+        function checkNotifications() {
+            const now = new Date();
+            const currentTime = now.getHours().toString().padStart(2, '0') + ':' + 
+                              now.getMinutes().toString().padStart(2, '0');
+            
+            todayQueue.forEach(item => {
+                if (item.scheduledTime === currentTime && !item.notified) {
+                    item.notified = true;
+                    
+                    if (item.userId === currentUser.id) {
+                        showNotification(`⏰ Ваше время: ${item.id} в ${currentTime}`);
+                    }
+                }
+            });
+        }
+        
+        // === ОСТАЛЬНЫЕ ФУНКЦИИ ===
         function checkUserInQueue() {
             return todayQueue.find(item => item.userId === currentUser.id);
         }
         
-        // Генерация временных слотов
         function generateTimeSlots() {
             const container = document.getElementById('timeSlots');
+            if (!container) return;
+            
             container.innerHTML = '';
             
             const now = new Date();
@@ -682,7 +845,6 @@
                     const startTime = hours * 60 + minutes;
                     const endTime = startTime + item.duration;
                     
-                    // Добавляем все слоты в пределах длительности как занятые
                     for (let time = startTime; time < endTime; time += 15) {
                         const busyHour = Math.floor(time / 60);
                         const busyMinute = time % 60;
@@ -711,7 +873,6 @@
             });
         }
         
-        // Выбор временного слота
         function selectTimeSlot(element) {
             document.querySelectorAll('.time-option').forEach(slot => {
                 slot.classList.remove('selected');
@@ -720,7 +881,6 @@
             selectedTime = element.dataset.time;
         }
         
-        // Выбор длительности
         function initDurationSelection() {
             const options = document.querySelectorAll('.duration-option');
             options.forEach(option => {
@@ -737,7 +897,6 @@
             });
         }
         
-        // Подтверждение записи по времени
         async function confirmTimeSelection() {
             if (!selectedTime) {
                 showNotification('Выберите время');
@@ -762,11 +921,11 @@
             };
             
             todayQueue.push(queueItem);
-            await saveQueueToGitHub();
+            saveQueueLocally();
+            updateQueueDisplay();
             showQueue(false);
         }
         
-        // Добавление в живую очередь
         async function addToLiveQueue() {
             if (checkUserInQueue()) {
                 showNotification('Вы уже в очереди');
@@ -780,124 +939,20 @@
                 userId: currentUser.id,
                 firstName: currentUser.firstName,
                 scheduledTime: null,
-                duration: 15, // Стандартная длительность для живой очереди
+                duration: 15,
                 joinTime: new Date().toISOString(),
                 isTimeSlot: false
             };
             
             todayQueue.push(queueItem);
-            await saveQueueToGitHub();
+            saveQueueLocally();
+            updateQueueDisplay();
         }
         
-        // Обновление отображения очереди
-        function updateQueueDisplay() {
-            const container = document.getElementById('queueList');
-            const subtitle = document.getElementById('queueSubtitle');
-            const currentUserCard = document.getElementById('currentUserCard');
-            const currentUserId = document.getElementById('currentUserId');
-            const currentUserTime = document.getElementById('currentUserTime');
-            
-            container.innerHTML = '';
-            
-            if (todayQueue.length === 0) {
-                subtitle.textContent = 'Очередь пуста. Будьте первым!';
-                currentUserCard.style.display = 'none';
-                return;
-            }
-            
-            // Сортируем очередь
-            const sortedQueue = [...todayQueue].sort((a, b) => {
-                if (a.scheduledTime && b.scheduledTime) {
-                    return a.scheduledTime.localeCompare(b.scheduledTime);
-                }
-                if (a.scheduledTime) return -1;
-                if (b.scheduledTime) return 1;
-                return new Date(a.joinTime) - new Date(b.joinTime);
-            });
-            
-            // Обновляем информацию
-            subtitle.textContent = `Записей: ${todayQueue.length}`;
-            
-            // Показываем карточку текущего пользователя
-            const userEntry = checkUserInQueue();
-            if (userEntry) {
-                currentUserCard.style.display = 'block';
-                currentUserId.textContent = userEntry.id;
-                
-                if (userEntry.scheduledTime) {
-                    const endTime = calculateEndTime(userEntry.scheduledTime, userEntry.duration);
-                    currentUserTime.textContent = `${userEntry.scheduledTime} - ${endTime} (${userEntry.duration} мин)`;
-                } else {
-                    currentUserTime.textContent = 'Вы в живой очереди';
-                }
-            } else {
-                currentUserCard.style.display = 'none';
-            }
-            
-            // Отображаем очередь
-            sortedQueue.forEach((item, index) => {
-                const div = document.createElement('div');
-                div.className = 'queue-item';
-                div.style.animationDelay = `${index * 0.05}s`;
-                
-                if (item.userId === currentUser.id) {
-                    div.classList.add('current-user-item');
-                }
-                
-                let timeInfo = '';
-                let durationInfo = '';
-                
-                if (item.scheduledTime) {
-                    const endTime = calculateEndTime(item.scheduledTime, item.duration);
-                    timeInfo = `${item.scheduledTime} - ${endTime}`;
-                    durationInfo = `${item.duration} мин`;
-                } else {
-                    timeInfo = `Встал: ${new Date(item.joinTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-                    durationInfo = `~${item.duration} мин`;
-                }
-                
-                div.innerHTML = `
-                    <div class="queue-id">${item.id}</div>
-                    <div class="queue-info">
-                        <div class="queue-time">${timeInfo}</div>
-                        <div class="queue-duration">${durationInfo}</div>
-                    </div>
-                `;
-                
-                container.appendChild(div);
-            });
-        }
-        
-        // Расчет времени окончания
-        function calculateEndTime(startTime, duration) {
-            const [hours, minutes] = startTime.split(':').map(Number);
-            const totalMinutes = hours * 60 + minutes + duration;
-            const endHours = Math.floor(totalMinutes / 60) % 24;
-            const endMinutes = totalMinutes % 60;
-            return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
-        }
-        
-        // Проверка уведомлений
-        function checkNotifications() {
-            const now = new Date();
-            const currentTime = now.getHours().toString().padStart(2, '0') + ':' + 
-                              now.getMinutes().toString().padStart(2, '0');
-            
-            todayQueue.forEach(item => {
-                if (item.scheduledTime === currentTime && !item.notified) {
-                    item.notified = true;
-                    saveQueueToGitHub();
-                    
-                    if (item.userId === currentUser.id) {
-                        showNotification(`Ваше время: ${item.id} в ${currentTime}`);
-                    }
-                }
-            });
-        }
-        
-        // Показ уведомления
         function showNotification(message) {
             const notification = document.getElementById('notification');
+            if (!notification) return;
+            
             notification.textContent = message;
             notification.classList.add('show');
             
@@ -906,7 +961,6 @@
             }, 3000);
         }
         
-        // Навигация
         function showWelcome() {
             document.getElementById('welcomeScreen').classList.remove('hidden');
             document.getElementById('timeScreen').classList.add('hidden');
@@ -923,13 +977,15 @@
             initDurationSelection();
             
             const dateDisplay = document.getElementById('dateDisplay');
-            const now = new Date();
-            dateDisplay.textContent = now.toLocaleDateString('ru-RU', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
+            if (dateDisplay) {
+                const now = new Date();
+                dateDisplay.textContent = now.toLocaleDateString('ru-RU', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            }
         }
         
         async function showQueue(isLiveQueue = false) {
@@ -939,12 +995,14 @@
             
             // Обновляем дату
             const dateDisplay = document.getElementById('queueDateDisplay');
-            const now = new Date();
-            dateDisplay.textContent = now.toLocaleDateString('ru-RU', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long'
-            });
+            if (dateDisplay) {
+                const now = new Date();
+                dateDisplay.textContent = now.toLocaleDateString('ru-RU', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long'
+                });
+            }
             
             // Загружаем очередь
             await loadQueueFromGitHub();
@@ -955,34 +1013,26 @@
             }
             
             updateQueueDisplay();
+            setupAutoRefresh();
         }
         
-        // Автообновление каждые 30 секунд
-        async function autoRefreshQueue() {
-            await loadQueueFromGitHub();
-            if (!document.getElementById('queueScreen').classList.contains('hidden')) {
-                updateQueueDisplay();
-            }
-            checkNotifications();
-        }
-        
-        // Инициализация
+        // === ИНИЦИАЛИЗАЦИЯ ===
         async function init() {
             initUser();
             
-            // Загружаем начальную очередь
-            await loadQueueFromGitHub();
+            // Настраиваем автообновление
+            setupAutoRefresh();
             
-            // Автообновление
-            setInterval(autoRefreshQueue, 30000);
+            // Проверяем уведомления
+            setInterval(checkNotifications, 60000);
             
-            // Проверяем, если пользователь уже в очереди
+            // Если пользователь уже в очереди
             if (checkUserInQueue()) {
                 setTimeout(() => showQueue(false), 500);
             }
         }
         
-        // Запуск
+        // === ЗАПУСК ===
         init();
     </script>
 </body>
