@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Станция Выхино | СЦД D1</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background: url("VihinoBG.jpg") no-repeat center center fixed;
+            background-size: cover;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container { display: flex; flex-direction: column; align-items: center; width: 100%; padding: 20px; }
+
+        /* --- Верхнее меню --- */
+        .station-row { display: flex; gap: 12px; margin-bottom: 60px; }
+        .badge {
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transform: skewX(-12deg);
+            border-radius: 8px;
+            padding: 20px 40px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+        .badge-content { display: block; transform: skewX(12deg); font-size: 2rem; font-weight: 700; letter-spacing: 2px; }
+        .badge-scp { background: rgba(37, 49, 158, 0.7); }
+        .badge-station { background: rgba(255, 255, 255, 0.2); }
+        .badge-d1 { background: rgba(19, 205, 186, 0.7); }
+
+        /* --- Карусель --- */
+        .carousel-wrapper {
+            width: 100%;
+            max-width: 900px;
+            /* Важно: здесь убираем лишний padding, чтобы не ломать выравнивание */
+            overflow: hidden; 
+        }
+
+        .carousel-slides { 
+            display: flex; 
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); 
+        }
+
+        .slide { 
+            min-width: 100%; 
+            padding: 0 15px; /* РАССТОЯНИЕ МЕЖДУ КАРТИНКАМИ: по 15px с каждой стороны */
+        }
+
+        .slide img { 
+            width: 100%; 
+            height: 450px; 
+            object-fit: cover; 
+            border-radius: 28px; 
+            display: block; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        .carousel-dots { display: flex; justify-content: center; gap: 10px; margin-top: 25px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.4); cursor: pointer; transition: 0.3s; }
+        .dot.active { background: white; width: 25px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="station-row">
+            <div class="badge badge-scp"><span class="badge-content">СЦД</span></div>
+            <div class="badge badge-station"><span class="badge-content">ВЫХИНО</span></div>
+            <div class="badge badge-d1"><span class="badge-content">D1</span></div>
+        </div>
+
+        <div class="carousel-wrapper">
+            <div class="carousel-slides" id="carouselSlides">
+                <div class="slide"><img src="Img/A1.png"></div>
+                <div class="slide"><img src="Img/A2.png"></div>
+                <div class="slide"><img src="Img/A3.png"></div>
+            </div>
+            <div class="carousel-dots" id="carouselDots"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const slidesContainer = document.getElementById('carouselSlides');
+            const dotsContainer = document.getElementById('carouselDots');
+            const slides = document.querySelectorAll('.slide');
+            let currentIndex = 0;
+
+            // Создаем точки
+            slides.forEach((_, index) => {
+                const dot = document.createElement('div');
+                dot.classList.add('dot');
+                if (index === 0) dot.classList.add('active');
+                dot.addEventListener('click', () => moveTo(index));
+                dotsContainer.appendChild(dot);
+            });
+
+            function moveTo(index) {
+                currentIndex = index;
+                // Сдвиг на 100% идеально работает, так как padding внутри слайда
+                slidesContainer.style.transform = `translateX(-${currentIndex * 100}%)`;
+                
+                document.querySelectorAll('.dot').forEach((dot, i) => {
+                    dot.classList.toggle('active', i === currentIndex);
+                });
+            }
+
+            setInterval(() => {
+                currentIndex = (currentIndex + 1) % slides.length;
+                moveTo(currentIndex);
+            }, 4000);
+        });
+    </script>
+</body>
+</html>
